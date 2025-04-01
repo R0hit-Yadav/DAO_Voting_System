@@ -6,28 +6,30 @@ use dotenv::dotenv;
 use std::env;
 use chrono::{NaiveDateTime, Utc, TimeZone, FixedOffset};
 
-#[tokio::main]
+#[tokio::main] // async entry point 
 async fn main() -> eyre::Result<()> {
-    dotenv().ok();
+    dotenv().ok(); // for read dotenv
 
+    //provider connect with infuts eth 
     let provider = Provider::<Http>::try_from(env::var("INFURA_API_URL")?)?;
     let wallet = env::var("PRIVATE_KEY")?.parse::<LocalWallet>()?;
-    let client = SignerMiddleware::new(provider.clone(), wallet.with_chain_id(17000u64));
-    let client = Arc::new(client);
 
+    let client = SignerMiddleware::new(provider.clone(), wallet.with_chain_id(17000u64));
+    let client = Arc::new(client); // shared accoross multiple task
+
+    //contract
     let contract_address: Address = env::var("CONTRACT_ADDRESS")?.parse()?;
-    let abi: Abi = serde_json::from_str(include_str!("../abi.json"))?;
+    let abi: Abi = serde_json::from_str(include_str!("../abi.json"))?;//pass abi 
     let contract = Contract::new(contract_address, abi, client.clone());
 
-    let cors = warp::cors()
-        .allow_any_origin()
-        .allow_headers(vec!["Content-Type"])
-        .allow_methods(vec!["POST", "GET"]);
+    //allowed cors for methods
+    let cors = warp::cors().allow_any_origin().allow_headers(vec!["Content-Type"]).allow_methods(vec!["POST", "GET"]);
 
     // create proposal
-    let create_proposal = warp::path("create_proposal")
-        .and(warp::post())
-        .and(warp::body::json())
+    let create_proposal = warp::path("create_proposal")  //define route
+        .and(warp::post())//handle POST req
+        .and(warp::body::json()) // accept json
+        //called createProposal function from eth contract 
         .and_then({
             let contract = contract.clone();
             move |proposal: ProposalInput| {
@@ -36,15 +38,14 @@ async fn main() -> eyre::Result<()> {
                     let method = contract
                         .method::<_, H256>("createProposal", (proposal.title, proposal.description, proposal.duration))
                         .unwrap();
-                    let tx = method.send().await.unwrap();
+                    let tx = method.send().await.unwrap(); // send tx 
                     let tx_hash = tx.tx_hash();
-                    Ok::<_, warp::Rejection>(warp::reply::json(&tx_hash))
+                    Ok::<_, warp::Rejection>(warp::reply::json(&tx_hash))//return tx hash
                 }
             }
-        })
-        .with(cors.clone());
+        }).with(cors.clone());
 
-    // voting method
+    // same as voting method
     let vote = warp::path("vote")
         .and(warp::post())
         .and(warp::body::json())
@@ -61,8 +62,7 @@ async fn main() -> eyre::Result<()> {
                     Ok::<_, warp::Rejection>(warp::reply::json(&tx_hash))
                 }
             }
-        })
-        .with(cors.clone());
+        }).with(cors.clone());
 
     // get proposal details
     let get_proposal = warp::path!("proposal" / u64)
@@ -89,8 +89,7 @@ async fn main() -> eyre::Result<()> {
                     Ok::<_, warp::Rejection>(warp::reply::json(&response))
                 }
             }
-        })
-        .with(cors.clone());
+        }).with(cors.clone());
 
     // list of all proposals
     let list_proposals = warp::path("proposals")
@@ -117,15 +116,16 @@ async fn main() -> eyre::Result<()> {
                     Ok::<_, warp::Rejection>(warp::reply::json(&response))
                 }
             }
-        })
-        .with(cors.clone());
+        }).with(cors.clone());
 
+    //Combined routes
     let routes = create_proposal.or(vote).or(get_proposal).or(list_proposals);
-
+    //localhost:3030
     warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
     Ok(())
 }
 
+//format deadline in IST
 fn format_deadline_ist(timestamp: u64) -> String {
     let naive_utc = NaiveDateTime::from_timestamp_opt(timestamp as i64, 0)
         .unwrap_or_else(|| NaiveDateTime::from_timestamp(0, 0));
