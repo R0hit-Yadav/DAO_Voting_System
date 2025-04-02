@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useWallet } from "./WalletContext";
+import { ethers } from "ethers";
 
 function CreateProposal() {
+    const { account, signer } = useWallet();
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [duration, setDuration] = useState("");
@@ -10,17 +13,29 @@ function CreateProposal() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        if (!account) {
+            alert("Please connect your wallet first");
+            return;
+        }
+
         setSubmitting(true);
         
         try {
-            const response = await fetch("http://localhost:3030/create_proposal", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ title, description, duration: parseInt(duration) })
-            });
-            const data = await response.json();
-            alert("Proposal created successfully! Transaction Hash: " + data);
+            // Get the contract ABI and address from the backend
+            const response = await fetch("http://localhost:3030/contract-info");
+            const { abi, address } = await response.json();
+
+            // Create contract instance
+            const contract = new ethers.Contract(address, abi, signer);
+
+            // Send transaction through MetaMask
+            const tx = await contract.createProposal(title, description, duration);
+            await tx.wait();
+
+            alert("Proposal created successfully! Transaction Hash: " + tx.hash);
             navigate('/');
+            
         } catch (error) {
             console.error("Error creating proposal:", error);
             alert("Failed to create proposal. Please try again.");
@@ -59,8 +74,8 @@ function CreateProposal() {
                         required 
                     />
                 </div>
-                <button type="submit" disabled={submitting}>
-                    {submitting ? "Creating..." : "Create Proposal"}
+                <button type="submit" disabled={submitting || !account}>
+                    {!account ? "Connect Wallet to Create" : submitting ? "Creating..." : "Create Proposal"}
                 </button>
             </form>
         </div>

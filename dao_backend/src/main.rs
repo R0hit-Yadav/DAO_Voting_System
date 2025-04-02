@@ -6,63 +6,35 @@ use dotenv::dotenv;
 use std::env;
 use chrono::{NaiveDateTime, Utc, TimeZone, FixedOffset};
 
-#[tokio::main] // async entry point 
+#[tokio::main]
 async fn main() -> eyre::Result<()> {
-    dotenv().ok(); // for read dotenv
+    dotenv().ok();
 
-    //provider connect with infuts eth 
-    let provider = Provider::<Http>::try_from(env::var("INFURA_API_URL")?)?;
-    let wallet = env::var("PRIVATE_KEY")?.parse::<LocalWallet>()?;
-
-    let client = SignerMiddleware::new(provider.clone(), wallet.with_chain_id(17000u64));
-    let client = Arc::new(client); // shared accoross multiple task
-
-    //contract
+    // Get contract address from env
     let contract_address: Address = env::var("CONTRACT_ADDRESS")?.parse()?;
-    let abi: Abi = serde_json::from_str(include_str!("../abi.json"))?;//pass abi 
+    let abi: Abi = serde_json::from_str(include_str!("../abi.json"))?;
+
+    // Create provider for read-only operations
+    let provider = Provider::<Http>::try_from(env::var("INFURA_API_URL")?)?;
+    let client = Arc::new(provider);
+
+    // Create contract instance for read-only operations
     let contract = Contract::new(contract_address, abi, client.clone());
 
     //allowed cors for methods
     let cors = warp::cors().allow_any_origin().allow_headers(vec!["Content-Type"]).allow_methods(vec!["POST", "GET"]);
 
-    // create proposal
-    let create_proposal = warp::path("create_proposal")  //define route
-        .and(warp::post())//handle POST req
-        .and(warp::body::json()) // accept json
-        //called createProposal function from eth contract 
-        .and_then({
-            let contract = contract.clone();
-            move |proposal: ProposalInput| {
-                let contract = contract.clone();
-                async move {
-                    let method = contract
-                        .method::<_, H256>("createProposal", (proposal.title, proposal.description, proposal.duration))
-                        .unwrap();
-                    let tx = method.send().await.unwrap(); // send tx 
-                    let tx_hash = tx.tx_hash();
-                    Ok::<_, warp::Rejection>(warp::reply::json(&tx_hash))//return tx hash
-                }
-            }
-        }).with(cors.clone());
-
-    // same as voting method
-    let vote = warp::path("vote")
-        .and(warp::post())
-        .and(warp::body::json())
-        .and_then({
-            let contract = contract.clone();
-            move |vote_input: VoteInput| {
-                let contract = contract.clone();
-                async move {
-                    let method = contract
-                        .method::<_, H256>("vote", (vote_input.proposal_id, vote_input.support))
-                        .unwrap();
-                    let tx = method.send().await.unwrap();
-                    let tx_hash = tx.tx_hash();
-                    Ok::<_, warp::Rejection>(warp::reply::json(&tx_hash))
-                }
-            }
-        }).with(cors.clone());
+    // Endpoint to get contract info
+    let contract_info = warp::path("contract-info")
+        .and(warp::get())
+        .map(move || {
+            let response = serde_json::json!({
+                "address": contract_address,
+                "abi": include_str!("../abi.json")
+            });
+            warp::reply::json(&response)
+        })
+        .with(cors.clone());
 
     // get proposal details
     let get_proposal = warp::path!("proposal" / u64)
@@ -119,7 +91,7 @@ async fn main() -> eyre::Result<()> {
         }).with(cors.clone());
 
     //Combined routes
-    let routes = create_proposal.or(vote).or(get_proposal).or(list_proposals);
+    let routes = contract_info.or(get_proposal).or(list_proposals);
     //localhost:3030
     warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
     Ok(())
@@ -135,21 +107,6 @@ fn format_deadline_ist(timestamp: u64) -> String {
     let ist_time = ist_offset.from_utc_datetime(&naive_utc);
 
     ist_time.format("%Y-%m-%d %H:%M:%S IST").to_string()
-}
-
-
-//structs
-#[derive(serde::Deserialize)]
-struct ProposalInput {
-    title: String,
-    description: String,
-    duration: u64,
-}
-
-#[derive(serde::Deserialize)]
-struct VoteInput {
-    proposal_id: u64,
-    support: bool,
 }
 
 #[derive(serde::Serialize)]

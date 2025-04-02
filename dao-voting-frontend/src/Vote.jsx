@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useWallet } from "./WalletContext";
+import { ethers } from "ethers";
 
 function Vote() {
     const { id } = useParams();
+    const { account, signer } = useWallet();
     const [support, setSupport] = useState(true);
     const [proposal, setProposal] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -22,15 +25,26 @@ function Vote() {
     }, [id]);
 
     const handleVote = async () => {
+        if (!account) {
+            alert("Please connect your wallet first");
+            return;
+        }
+
         setSubmitting(true);
         try {
-            const response = await fetch("http://localhost:3030/vote", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ proposal_id: parseInt(id), support })
-            });
-            const data = await response.json();
-            alert(`Vote submitted successfully! Transaction Hash: ${data}`);
+            // Get the contract ABI and address from the backend
+            const response = await fetch("http://localhost:3030/contract-info");
+            const { abi, address } = await response.json();
+
+            // Create contract instance
+            const contract = new ethers.Contract(address, abi, signer);
+
+            // Send transaction through MetaMask
+            const tx = await contract.vote(id, support);
+            await tx.wait();
+
+            alert(`Vote submitted successfully! Transaction Hash: ${tx.hash}`);
+            
             // Refresh proposal data after voting
             const updatedProposal = await fetch(`http://localhost:3030/proposal/${id}`).then(res => res.json());
             setProposal(updatedProposal);
@@ -82,9 +96,9 @@ function Vote() {
                     
                     <button 
                         onClick={handleVote} 
-                        disabled={submitting || votingClosed}
+                        disabled={submitting || votingClosed || !account}
                     >
-                        {submitting ? "Submitting..." : "Submit Vote"}
+                        {!account ? "Connect Wallet to Vote" : submitting ? "Submitting..." : "Submit Vote"}
                     </button>
                 </>
             )}
