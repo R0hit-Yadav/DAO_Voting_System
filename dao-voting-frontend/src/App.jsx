@@ -4,6 +4,7 @@ import Home from "./Home";
 import CreateProposal from "./CreateProposal";
 import ProposalDetails from "./ProposalDetails";
 import Vote from "./Vote";
+import Leaderboard from "./Leaderboard";
 
 function WalletButton() {
     const { account, connectWallet, disconnectWallet, error } = useWallet();
@@ -35,6 +36,7 @@ function App() {
                     <ul>
                         <li><Link to="/">Home</Link></li>
                         <li><Link to="/create">Create Proposal</Link></li>
+                        <li><Link to="/leaderboard">Leaderboard</Link></li>
                     </ul>
                     <WalletButton />
                 </nav>
@@ -45,6 +47,7 @@ function App() {
                         <Route path="/create" element={<CreateProposal />} />
                         <Route path="/proposal/:id" element={<ProposalDetails />} />
                         <Route path="/vote/:id" element={<Vote />} />
+                        <Route path="/leaderboard" element={<Leaderboard />} />
                     </Routes>
                 </main>
             </Router>
