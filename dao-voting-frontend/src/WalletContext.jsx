@@ -29,6 +29,17 @@ export function WalletProvider({ children }) {
         }
     };
 
+    const disconnectWallet = async () => {
+        try {
+            // Simply clear the state without requesting permissions
+            setAccount(null);
+            setProvider(null);
+            setSigner(null);
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
     useEffect(() => {
         // Check if wallet is already connected
         if (window.ethereum) {
@@ -61,7 +72,7 @@ export function WalletProvider({ children }) {
     }, []);
 
     return (
-        <WalletContext.Provider value={{ account, provider, signer, error, connectWallet }}>
+        <WalletContext.Provider value={{ account, provider, signer, error, connectWallet, disconnectWallet }}>
             {children}
         </WalletContext.Provider>
     );

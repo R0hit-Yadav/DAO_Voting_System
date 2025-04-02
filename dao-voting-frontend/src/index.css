@@ -396,6 +396,29 @@ nav ul {
   font-size: 0.9rem;
   font-weight: 500;
   border: 1px solid rgba(131, 56, 236, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.disconnect-wallet {
+  background-color: var(--danger);
+  color: white;
+  border: none;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--border-radius);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.disconnect-wallet:hover {
+  background-color: #d93d61;
+  transform: translateY(-2px);
+}
+
+.disconnect-wallet:active {
+  transform: translateY(0);
 }
 
 /* Error Message */

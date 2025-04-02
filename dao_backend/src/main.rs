@@ -4,7 +4,7 @@ use ethers::abi::Abi;
 use std::sync::Arc;
 use dotenv::dotenv;
 use std::env;
-use chrono::{NaiveDateTime, Utc, TimeZone, FixedOffset};
+use chrono::{NaiveDateTime, TimeZone, FixedOffset};
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {

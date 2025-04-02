@@ -6,14 +6,17 @@ import ProposalDetails from "./ProposalDetails";
 import Vote from "./Vote";
 
 function WalletButton() {
-    const { account, connectWallet, error } = useWallet();
+    const { account, connectWallet, disconnectWallet, error } = useWallet();
     
     return (
         <div className="wallet-section">
             {error && <div className="error">{error}</div>}
             {account ? (
                 <div className="wallet-connected">
-                    Connected: {account.slice(0, 6)}...{account.slice(-4)}
+                    <span>Connected: {account.slice(0, 6)}...{account.slice(-4)}</span>
+                    <button onClick={disconnectWallet} className="disconnect-wallet">
+                        Disconnect
+                    </button>
                 </div>
             ) : (
                 <button onClick={connectWallet} className="connect-wallet">
